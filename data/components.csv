@@ -1,0 +1,3 @@
+name,voltage,power,sunlight
+Thrusters,12,6,true
+obc,5,0.8,false
