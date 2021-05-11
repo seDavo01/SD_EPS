@@ -37,13 +37,14 @@ class SolarPanel():
     @property
     def power(self):
         constant = self.__parameters.p_EOL * self.__parameters.cell_area * self.__parameters.phi
-        angle = self.__anglevec[self.time]
-        if self.__face == 'z':
-            return self.__n_cells * constant * np.sin(angle)
-        if self.__face == 'x':
-            if angle < np.pi/2:
-                return self.__n_cells * constant * np.cos(angle)
-            return self.__n_cells * constant * np.cos(angle + np.pi)
+        if self.__face != 'track':
+            angle = self.__anglevec[self.time]
+            if self.__face == 'z':
+                return self.__n_cells * constant * np.sin(angle)
+            if self.__face == 'x':
+                if angle < np.pi/2:
+                    return self.__n_cells * constant * np.cos(angle)
+                return self.__n_cells * constant * np.cos(angle + np.pi)
         return self.__voltage * self.__current
             
     @property
@@ -173,6 +174,14 @@ class Payload():
             self.__active = 0
 
     @property
+    def start(self):
+        return self.__start
+
+    @start.setter
+    def start(self, value):
+        self.__start = value
+
+    @property
     def raw_data(self):
         return self.__raw_data
 
@@ -227,6 +236,7 @@ class Payload():
     def reset(self):
         self.time = -1
         self.active = True
+        self.start = False
         self.__status = 'idle'
         self.__next_status = 'idle'
         self.__raw_data = 0
@@ -280,6 +290,7 @@ class Payload():
 
         if self.window and self.status == 'idle' and self.next_status == 'acquisition':
             self.__status = 'acquisition'
+            # self.start = False
         if not self.window and self.status == 'acquisition':
             if self.next_window < 6000:
                 self.__status = 'idle'
@@ -288,10 +299,17 @@ class Payload():
                 self.__status = 'elaboration'
                 self.next_status = 'idle'
         if self.__elaboration == 'sunlight':
-            if self.status == 'elaboration' and self.__sunvec == 0:
+            if self.status == 'elaboration' and self.__sunvec[self.time] == 0:
                 self.__status = 'idle'
                 self.next_status = 'elaboration'
-            elif self.status == 'idle' and self.next_status == 'elaboration' and self.__sunvec == 1:
+            elif self.status == 'idle' and self.next_status == 'elaboration' and self.__sunvec[self.time] == 1:
+                self.__status = 'elaboration'
+                self.next_status = 'idle'
+        else:
+            if self.status == 'elaboration':
+                self.__status = 'idle'
+                self.next_status = 'elaboration'
+            elif self.status == 'idle' and self.next_status == 'elaboration':
                 self.__status = 'elaboration'
                 self.next_status = 'idle'
 
@@ -316,8 +334,8 @@ class TTC():
     def __init__(self,
                  parameters: TTCParameters,
                  mode: str = 'S-band',
-                 sunlight: bool = True,
-                 target: bool = True,
+                 sunlight: bool = False,
+                 target: bool = False,
                  GS_data: list = None,
                  eclipse_data: pd.DataFrame = None,
                  target_data: pd.DataFrame = None,
@@ -326,9 +344,9 @@ class TTC():
         if mode not in ['S-band', 'UHF']:
             raise ValueError('mode need to be S-band or UHF')
         else:
-            if sunlight and eclipse_data == None:
+            if sunlight and type(eclipse_data) != pd.core.frame.DataFrame:
                 raise ValueError('missing eclipse data')
-            if target and target_data == None:
+            if target and type(target_data) != pd.core.frame.DataFrame:
                 raise ValueError('missing target data')
             if mode == 'S-band' and GS_data == None:
                 raise ValueError('while using S-band, it is needed to have GS_data')
@@ -476,7 +494,15 @@ class TTC():
 
                     last_dt = dt_stop
                 vecs.append(np.zeros((dt_mission_end - last_dt).seconds))
-                timevecs.append(np.concatenate(vecs).tolist())
+                timevecs.append(np.concatenate(vecs))
+
+            max_len = 0
+            for timevec in timevecs:
+                if len(timevec) > max_len:
+                    max_len = len(timevec)
+            for i, timevec in enumerate(timevecs):
+                if len(timevec) < max_len:
+                    timevecs[i] = np.concatenate((timevec, np.zeros((max_len - len(timevec)))))
 
             timevec = np.sum(timevecs, 0)
             access = timevec > 0
@@ -569,13 +595,17 @@ class BatteryPack():
             self.__capacity = parameters.efficiency * self.__nominal_capacity
         else:
             self.__capacity = self.__nominal_capacity
-        self.__SOC = starting_SOC * self.__capacity
+        self.__SOC = starting_SOC
 
         self.reset()
 
     @property
     def voltage(self):
         return self.__voltage
+
+    @property
+    def soc(self):
+        return self.__SOC
 
     @property
     def active(self):
@@ -595,15 +625,16 @@ class BatteryPack():
     @property
     def input(self):
         if self.active:
-            self.__input
+            return self.__input
 
     @property
     def output(self):
         if self.active:
-            self.__output
+            return self.__output
 
     def reset(self):
         self.__status = 'idle'
+        self.active = True
         self.__input = 0
         self.__output = 0
 
@@ -611,25 +642,27 @@ class BatteryPack():
         log = list()
         if power > 0:
             self.__output = 0
-            if self.__SOC == 1:
+            if self.__SOC >= 1:
+                self.__SOC = 1
                 self.__input = 0
                 self.__status = 'idle'
             elif power > self.__parameters.min_charge_rate * self.__capacity * self.voltage:
                 base = self.__parameters.min_charge_rate * self.__capacity * self.voltage
-                while power > base + self.__parameters.charge_step * self.__capacity * self.voltage:
+                while power > base + self.__parameters.charge_step * self.__capacity * self.voltage and base < self.__parameters.max_charge_rate * self.__capacity * self.voltage:
                     base += base + self.__parameters.charge_step * self.__capacity * self.voltage
                 self.__input = base
-                self.__SOC += ((self.__capacity * self.voltage) / self.__input) * timestep 
+                self.__SOC += self.input / (self.__capacity * self.voltage) * timestep / 3600
                 self.__status = 'charging'
         elif power < 0:
             self.__input = 0
-            if self.__SOC == 0:
+            if self.__SOC <= 0:
+                self.__SOC = 0
                 self.__output = 0
                 self.__status = 'dead'
                 log.append('Battery failure')
             elif abs(power) < self.__parameters.max_discharge_rate * self.__capacity * self.voltage:
                 self.__output = abs(power)
-                self.__SOC -= ((self.__capacity * self.voltage) / self.__output) * timestep
+                self.__SOC -= (self.__output / (self.__capacity * self.voltage)) * timestep / 3600
                 self.__status = 'discharging'
             else:
                 self.__status = 'failure'
@@ -646,7 +679,7 @@ class Component():
                  eclipse_data: pd.DataFrame = None,
                  ):
         
-        if parameters.sunlight and eclipse_data == None:
+        if parameters.sunlight and type(eclipse_data) != pd.core.frame.DataFrame:
             raise ValueError('missing eclipse data')
 
         self.__parameters = parameters
