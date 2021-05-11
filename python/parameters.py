@@ -5,8 +5,13 @@ class MissionParameters():
     dt_mission_start = datetime.strptime('1 Mar 2023 00:00:00.000', date_format)
     dt_mission_end = datetime.strptime('1 Apr 2023 00:00:00.000', date_format)
 
+class SystemParameters():
+    solar_efficiency = 0.9
+    converters_efficiency = 0.9
+
 class SolarCellParameters():
-    p_EOL = 0.293
+    p_BOL = 0.293
+    p_EOL = 0.278
     phi = 1367
     cell_area = 0.003018
     voltage = 2.4                       # V
@@ -19,10 +24,10 @@ class BatteryCellParameters():
     max_voltage = 4.0                   # V
     voltage = 3.6                       # V
     min_charge_rate = 0.1
-    charge_step = 0.05
+    charge_step = 0.1
     max_charge_rate = 0.5
     max_discharge_rate = 1
-    efficiency = 0.85
+    efficiency = 0.80
     max_DOD = 0.15
 
 
@@ -34,6 +39,7 @@ class PayloadParameters():
     acquisition_datarate = 0.4          # GB/s
     elaboration_basetime = 4*60/10      # s
     elaboration_datarate = [-acquisition_datarate/elaboration_basetime , 0.0044/elaboration_basetime ]       # GB/s
+    transfer_datarate = 10*10**-3/8     # GB/s
 
 class TTCParameters():
     voltage = 12                        # V

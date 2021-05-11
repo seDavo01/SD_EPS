@@ -10,7 +10,10 @@ def csvtoparameters(file_path):
     for name, voltage, power, sunlight in zip(df['name'], df['voltage'], df['power'], df['sunlight']):
         param = ComponentParameters()
         param.name = name
-        param.voltage = float(voltage)
+        if voltage != 'Vbat':
+            param.voltage = float(voltage)
+        else:
+            param.voltage = voltage
         param.power = float(power)
         param.sunlight = sunlight
 

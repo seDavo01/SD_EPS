@@ -14,6 +14,7 @@ class SolarPanel():
                  n_parallel: int = 1,
                  face: str = 'track',
                  angle_data: pd.DataFrame = None,
+                 EOL: bool = False
                  ):
         
         self.__parameters = cell_parameters
@@ -22,6 +23,10 @@ class SolarPanel():
         self.__current = n_parallel * cell_parameters.current
         # self.__power = self.__voltage * self.__current
         self.__face = face
+        if EOL:
+            self.__p = cell_parameters.p_EOL
+        else:
+            self.__p = cell_parameters.p_BOL
 
         self.__initdata(eclipse_data, angle_data)
         self.reset()
@@ -36,16 +41,16 @@ class SolarPanel():
 
     @property
     def power(self):
-        constant = self.__parameters.p_EOL * self.__parameters.cell_area * self.__parameters.phi
+        constant = self.__n_cells * self.__p * self.__parameters.cell_area * self.__parameters.phi
         if self.__face != 'track':
             angle = self.__anglevec[self.time]
             if self.__face == 'z':
-                return self.__n_cells * constant * np.sin(angle)
+                return constant * np.sin(angle)
             if self.__face == 'x':
                 if angle < np.pi/2:
-                    return self.__n_cells * constant * np.cos(angle)
-                return self.__n_cells * constant * np.cos(angle + np.pi)
-        return self.__voltage * self.__current
+                    return  constant * np.cos(angle)
+                return constant * np.cos(angle + np.pi)
+        return constant
             
     @property
     def time(self):
@@ -137,6 +142,7 @@ class Payload():
 
         self.__power = {
             'idle': parameters.idle_power_consumption,
+            'transfer': parameters.idle_power_consumption,
             'elaboration': parameters.elaboration_power_consumption,
             'acquisition': parameters.acquisition_power_consumption
         }   
@@ -186,12 +192,12 @@ class Payload():
         return self.__raw_data
 
     @property
-    def output_data(self):
-        return self.__output_data
+    def processed_data(self):
+        return self.__processed_data
 
     @property
-    def cleardata(self):
-        self.__output_data = 0
+    def output_data(self):
+        return self.__output_data
 
     @property
     def status(self):
@@ -203,7 +209,7 @@ class Payload():
 
     @next_status.setter
     def next_status(self, value: str):
-        if value in ['idle', 'elaboration', 'acquisition']:
+        if value in ['idle', 'transfer', 'elaboration', 'acquisition']:
             self.__next_status = value
         else:
             print('invalid status for Payload')
@@ -240,6 +246,7 @@ class Payload():
         self.__status = 'idle'
         self.__next_status = 'idle'
         self.__raw_data = 0
+        self.__processed_data = 0
         self.__output_data = 0
         self.step()
 
@@ -298,6 +305,7 @@ class Payload():
             else:
                 self.__status = 'elaboration'
                 self.next_status = 'idle'
+
         if self.__elaboration == 'sunlight':
             if self.status == 'elaboration' and self.__sunvec[self.time] == 0:
                 self.__status = 'idle'
@@ -306,25 +314,34 @@ class Payload():
                 self.__status = 'elaboration'
                 self.next_status = 'idle'
         else:
-            if self.status == 'elaboration':
-                self.__status = 'idle'
-                self.next_status = 'elaboration'
-            elif self.status == 'idle' and self.next_status == 'elaboration':
+            if self.status == 'idle' and self.next_status == 'elaboration':
                 self.__status = 'elaboration'
                 self.next_status = 'idle'
 
-        if self.__status == 'acquisition':
+        if self.status == 'idle' and self.next_status == 'transfer':
+            self.__status = 'transfer'
+            self.next_status = 'idle'
+
+        if self.status == 'acquisition':
             self.__raw_data += self.__parameters.acquisition_datarate * timestep
-        elif self.__status == 'elaboration':
+        elif self.status == 'elaboration':
             self.__raw_data += self.__parameters.elaboration_datarate[0] * timestep
-            self.__output_data += self.__parameters.elaboration_datarate[1] * timestep
+            self.__processed_data += self.__parameters.elaboration_datarate[1] * timestep
             if self.__raw_data < 0:
                 self.__status = 'idle'
                 self.next_status = 'idle'
                 self.__raw_data = 0
+        elif self.status == 'transfer':
+            self.__processed_data -= self.__parameters.transfer_datarate * timestep
+            self.__output_data = self.__parameters.transfer_datarate * timestep
+            if self.__processed_data < 0:
+                self.__status = 'idle'
+                self.next_status = 'idle'
+                self.__processed_data = 0
+                self.__output_data = 0
 
-                # print(self.__output_data)
-                # self.__output_data = 0
+                # print(self.__processed_data)
+                # self.__processed_data = 0
 
         return log
 
@@ -400,8 +417,8 @@ class TTC():
     def data(self):
         return self.__data
 
-    @property
-    def add_data(self, value):
+    @data.setter
+    def data(self, value):
         self.__data += value
 
     @property
@@ -595,6 +612,7 @@ class BatteryPack():
             self.__capacity = parameters.efficiency * self.__nominal_capacity
         else:
             self.__capacity = self.__nominal_capacity
+        self.__starting_SOC = starting_SOC
         self.__SOC = starting_SOC
 
         self.reset()
@@ -635,6 +653,7 @@ class BatteryPack():
     def reset(self):
         self.__status = 'idle'
         self.active = True
+        self.__SOC = self.__starting_SOC
         self.__input = 0
         self.__output = 0
 

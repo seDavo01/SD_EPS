@@ -1,3 +1,19 @@
 name,voltage,power,sunlight
 Thrusters,12,6,true
-obc,5,0.8,false
+obc,3.3,0.8,false
+obc,3.3,0.4,false
+GNSS receiver antenna,3.3,0.033,false
+GNSS receiver,3.3,0.5,false
+Nanopower P60,3.3,0.1,false
+ACU,3.3,0.33,false
+PDU,3.3,0.165,false
+PDU (DC/DC converter),Vbat,0.08,false
+PDU (DC/DC converter),Vbat,0.08,false
+PDU (DC/DC converter),Vbat,0.08,false
+Reaction wheel,3.3,0.4,false
+Reaction wheel,3.3,0.4,false
+Reaction wheel,3.3,0.4,false
+Sun sensor,5,0.01,false
+Magnetometer,5,0.00825,false
+IMU,5,1.4,false
+Star Tracker,5,0.22,false
