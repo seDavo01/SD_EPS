@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import math
 import pandas as pd
 import numpy as np
 
@@ -456,9 +457,9 @@ class TTC():
 
     @property
     def window(self):
-        if self.timevec == None and self.__sunvec == None and self.__targetvec == None:
-            return True
-        result = False
+        # if self.timevec == None and self.__sunvec == None and self.__targetvec == None:
+        #     return True
+        result = True
         if self.timevec is not None:
             result = self.timevec[self.time] == 1
         if self.__sunvec is not None:
@@ -545,7 +546,7 @@ class TTC():
         else:
             self.__sunvec = None
 
-        if target_data:
+        if target:
             last_dt = missionparameters.dt_mission_start
             vecs = list()
             for start_time, stop_time in zip(target_data['Start Time (UTCG)'], target_data['Stop Time (UTCG)']):
@@ -567,10 +568,10 @@ class TTC():
         
         log = list()
         temp_time = self.time + timestep
-        if temp_time >= self.datalen:
-            log.append(['WARNING: no TTC data'])
-            self.active = False
-            return log
+        # if temp_time >= self.datalen:
+        #     log.append(['WARNING: no TTC data'])
+        #     self.active = False
+        #     return log
 
         self.time = temp_time
 
@@ -594,6 +595,7 @@ class TTC():
                 self.__status = 'idle'
 
         return log
+
 
 class BatteryPack():
 
@@ -661,17 +663,27 @@ class BatteryPack():
         log = list()
         if power > 0:
             self.__output = 0
+            base = self.__parameters.min_charge_rate * self.__capacity * self.voltage
+            cstep = self.__parameters.charge_step * self.__capacity * self.voltage
+            cap = self.__parameters.max_charge_rate * self.__capacity * self.voltage
             if self.__SOC >= 1:
                 self.__SOC = 1
                 self.__input = 0
-                self.__status = 'idle'
-            elif power > self.__parameters.min_charge_rate * self.__capacity * self.voltage:
-                base = self.__parameters.min_charge_rate * self.__capacity * self.voltage
-                while power > base + self.__parameters.charge_step * self.__capacity * self.voltage and base < self.__parameters.max_charge_rate * self.__capacity * self.voltage:
-                    base += base + self.__parameters.charge_step * self.__capacity * self.voltage
-                self.__input = base
+            elif power > cap:
+                    # while power > (base + cstep) and base < cap:
+                    #     base += base + cstep
+                self.__input = cap
+            elif power > base:
+                r = (power - base) / cstep
+                self.__input = base + math.floor(r) * cstep 
+            else:
+                self.__input = 0
+            
+            if self.input > 0:
                 self.__SOC += self.input / (self.__capacity * self.voltage) * timestep / 3600
                 self.__status = 'charging'
+            else:
+                self.__status = 'idle'
         elif power < 0:
             self.__input = 0
             if self.__SOC <= 0:
@@ -688,7 +700,6 @@ class BatteryPack():
                 log.append('Battery failure')
         
         return log
-
 
 
 class Component():
@@ -779,6 +790,112 @@ class Component():
         if self.__sunvec is not None:
             if temp_time >= len(self.__sunvec):
                 log.append(['WARNING: no {} data'.format(self.__parameters.name)])
+                self.active = False
+                return log
+
+        self.time = temp_time
+
+        return log
+
+
+class Heater():
+
+    def __init__(self,
+                 parameters: ComponentParameters,
+                 eclipse_data: pd.DataFrame = None,
+                 ):
+        
+        if type(eclipse_data) != pd.core.frame.DataFrame:
+            raise ValueError('missing eclipse data')
+
+        self.__parameters = parameters
+        self.__voltage = parameters.voltage 
+        self.__power = parameters.power_consumption
+
+        self.__initdata(eclipse_data)
+        self.reset()
+
+    @property
+    def voltage(self):
+        return self.__voltage
+
+    # @property
+    # def current(self):
+    #     return self.__current
+
+    @property
+    def time(self):
+        return self.__time
+
+    @time.setter
+    def time(self, value):
+        self.__time = value
+
+    @property
+    def active(self):
+        return self.__active == 1
+
+    @active.setter
+    def active(self, value):
+        if value:
+            self.__active = 1
+        else:
+            self.__active = 0
+
+    @property
+    def input(self):
+        if self.active:
+            if self.__heatvec is not None:
+                return self.__power * self.__heatvec[self.time]
+            return self.__power
+        return 0
+
+    def reset(self):
+        self.time = -1
+        self.active = True
+        self.step()
+
+    def __initdata(self, eclipse_data):
+        missionparameters = MissionParameters()
+        date_format = missionparameters.date_format
+        dt_mission_end = missionparameters.dt_mission_end
+
+        last_dt = missionparameters.dt_mission_start
+        vecs = list()
+        for start_time, stop_time in zip(eclipse_data['Start Time (UTCG)'], eclipse_data['Stop Time (UTCG)']):
+
+            dt_start = datetime.strptime(start_time, date_format)
+            dt_stop = datetime.strptime(stop_time, date_format)
+
+            if last_dt != dt_start:
+                sun = (dt_start - last_dt).seconds
+                act = int(sun * self.__parameters.sun_duration)
+                inact = sun - act
+                vecs.append(np.ones(act))
+                vecs.append(np.zeros(inact))
+            eclipse = (dt_stop - dt_start).seconds
+            if eclipse > 10:
+                act = int(eclipse * self.__parameters.eclipse_duration)
+                inact = eclipse - act
+                vecs.append(np.zeros(inact))
+                vecs.append(np.ones(act))
+            else:
+                if vecs[-1][-1] == 1:
+                    vecs.append(np.ones(eclipse))
+                else:
+                    vecs.append(np.zeros(eclipse))
+
+            last_dt = dt_stop
+        vecs.append(np.zeros((dt_mission_end - last_dt).seconds))
+        self.__heatvec = np.hstack(vecs).tolist()
+
+    def step(self, timestep = 1):
+        
+        log = list()
+        temp_time = self.time + timestep
+        if self.__heatvec is not None:
+            if temp_time >= len(self.__heatvec):
+                log.append(['WARNING: no Heater data'])
                 self.active = False
                 return log
 

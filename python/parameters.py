@@ -11,7 +11,7 @@ class SystemParameters():
 
 class SolarCellParameters():
     p_BOL = 0.293
-    p_EOL = 0.278
+    p_EOL = 0.270
     phi = 1367
     cell_area = 0.003018
     voltage = 2.4                       # V
@@ -46,8 +46,14 @@ class TTCParameters():
     idle_power_consumption = 0.1        # W
     rx_power_consumption = 0.2          # W
     tx_power_consumption = 9            # W
-    average_power_consumption = 0.8     # W
+    average_power_consumption = 0.6     # W
     datarate = 12.5*10**-3/8            # GB/s
+
+class HeaterParameters():
+    voltage = 12                        # V
+    power_consumption = 6               # W
+    eclipse_duration = 0.6
+    sun_duration = 0
 
 class ComponentParameters():
     name = 'placeholder'
