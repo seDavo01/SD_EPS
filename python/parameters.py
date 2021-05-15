@@ -6,7 +6,7 @@ class MissionParameters():
     dt_mission_end = datetime.strptime('1 Apr 2023 00:00:00.000', date_format)
 
 class SystemParameters():
-    solar_efficiency = 0.9
+    solar_efficiency = 0.8
     converters_efficiency = 0.9
 
 class SolarCellParameters():
@@ -33,7 +33,7 @@ class BatteryCellParameters():
 
 class PayloadParameters():
     voltage = 12                        # V
-    idle_power_consumption = 2          # W
+    idle_power_consumption = 1.2        # W
     elaboration_power_consumption = 6   # W
     acquisition_power_consumption = 12  # W
     acquisition_datarate = 0.4          # GB/s
@@ -46,7 +46,7 @@ class TTCParameters():
     idle_power_consumption = 0.1        # W
     rx_power_consumption = 0.2          # W
     tx_power_consumption = 9            # W
-    average_power_consumption = 0.6     # W
+    average_power_consumption = 0.9     # W
     datarate = 12.5*10**-3/8            # GB/s
 
 class HeaterParameters():

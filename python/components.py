@@ -87,7 +87,7 @@ class SolarPanel():
         return 0
 
     def reset(self):
-        self.time = -1
+        self.__time = -1
         self.active = True
         self.step()
 
@@ -118,13 +118,13 @@ class SolarPanel():
     def step(self, timestep = 1):
         
         log = list()
-        temp_time = self.time + timestep
+        temp_time = self.__time + timestep
         if temp_time >= self.datalen:
             log.append(['WARNING: no solar data'])
             self.active = False
             return log
 
-        self.time = temp_time
+        self.__time = temp_time
 
         return log
 
@@ -801,7 +801,7 @@ class Component():
 class Heater():
 
     def __init__(self,
-                 parameters: ComponentParameters,
+                 parameters: HeaterParameters,
                  eclipse_data: pd.DataFrame = None,
                  ):
         
@@ -869,24 +869,29 @@ class Heater():
 
             if last_dt != dt_start:
                 sun = (dt_start - last_dt).seconds
-                act = int(sun * self.__parameters.sun_duration)
-                inact = sun - act
-                vecs.append(np.ones(act))
-                vecs.append(np.zeros(inact))
-            eclipse = (dt_stop - dt_start).seconds
-            if eclipse > 10:
-                act = int(eclipse * self.__parameters.eclipse_duration)
-                inact = eclipse - act
-                vecs.append(np.zeros(inact))
-                vecs.append(np.ones(act))
-            else:
-                if vecs[-1][-1] == 1:
-                    vecs.append(np.ones(eclipse))
+                if self.__parameters.sun_duration > 0:
+                    act = math.floor(sun * self.__parameters.sun_duration)
+                    vecs.append(np.ones(act))
+                    vecs.append(np.zeros(sun - act))
                 else:
-                    vecs.append(np.zeros(eclipse))
+                    vecs.append(np.zeros(sun))
+            eclipse = (dt_stop - dt_start).seconds
+            if self.__parameters.eclipse_duration > 0:
+                if eclipse > 10:
+                    act = math.floor(eclipse * self.__parameters.eclipse_duration)
+                    vecs.append(np.zeros(eclipse - act))
+                    vecs.append(np.ones(act))
+                else:
+                    if vecs[-1][-1] == 1:
+                        vecs.append(np.ones(eclipse))
+                    else:
+                        vecs.append(np.zeros(eclipse))
+            else:
+                vecs.append(np.zeros(eclipse))
 
             last_dt = dt_stop
         vecs.append(np.zeros((dt_mission_end - last_dt).seconds))
+
         self.__heatvec = np.hstack(vecs).tolist()
 
     def step(self, timestep = 1):
