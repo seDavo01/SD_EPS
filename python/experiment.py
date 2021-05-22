@@ -58,6 +58,7 @@ class Experiment():
             'payload_status': [],
             'batteries_status': [],
             'S-band_status': [],
+            'UHF_status': [],
             'heaters_status': [],
         }
 
@@ -308,6 +309,8 @@ class Experiment():
             for ttc in self.ttcs:
                 if ttc.mode == 'S-band':
                     self.results[self.key]['S-band_status'].append(ttc.status)
+                elif ttc.mode == 'UHF':
+                    self.results[self.key]['UHF_status'].append(ttc.status)
             if self.heaters[0].input > 0:
                 heaters_status = 'active'
             else:

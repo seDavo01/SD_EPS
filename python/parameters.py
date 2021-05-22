@@ -33,7 +33,7 @@ class BatteryCellParameters():
 
 class PayloadParameters():
     voltage = 12                        # V
-    idle_power_consumption = 1.2        # W
+    idle_power_consumption = 0.6        # W
     elaboration_power_consumption = 6   # W
     acquisition_power_consumption = 12  # W
     acquisition_datarate = 0.4          # GB/s
