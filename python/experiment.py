@@ -25,23 +25,9 @@ class Experiment():
 
         self.key = None
         self.results = dict()
-        # self.values = {
-        #     'input_power': [],
-        #     'output_power': {
-        #         'Vbat': 0,
-        #         12: 0,
-        #         5: 0,
-        #         3.3: 0,
-        #     },
-        #     'batteries': {
-        #         'input_power': 0,
-        #         'output_power': 0,
-        #         'SOC': 0
-        #     },
-        #     'diss_power': 0,
-        # }
 
         self.output_folder = output_folder
+        self.f = None
 
     def reset(self):
         comps = list()
@@ -62,8 +48,11 @@ class Experiment():
         self.key = key
         self.results[self.key] = {
             'input_power': [],
-            'output_power': [],
+            'total_load_power': [],
+            'load_power': [],
+            'load_current': [],
             'heaters_power': [],
+            'ttc_power': [],
             'batteries': [],
             'diss_power': [],
             'payload_status': [],
@@ -103,46 +92,112 @@ class Experiment():
 
         return time + absolute_time
 
-    def plot(self):
+    def __plot(self,
+               loc: tuple,
+               timeline: list,
+               name: list, 
+               legend: bool = False
+               ):
+
+        if type(name) == str:
+            self.axarr[loc[0],loc[1]].set_title(name)
+            self.axarr[loc[0],loc[1]].set_xlabel('Time (s)')
+            self.axarr[loc[0],loc[1]].set_ylabel('Power (W)')
+            self.axarr[loc[0],loc[1]].set_ylim((0, 40))
+            self.axarr[loc[0],loc[1]].plot(timeline, self.results[self.key][name])
+        elif type(name) == list and len(name) == 2:
+            c = name[0]
+            n = name[1]
+            self.axarr[loc[0],loc[1]].set_title(c + ' ' + str(n))
+            self.axarr[loc[0],loc[1]].set_xlabel('Time (s)')
+            if 'power' in c:
+                self.axarr[loc[0],loc[1]].set_ylabel('Power (W)')
+                self.axarr[loc[0],loc[1]].set_ylim((0, 40))
+            elif 'current' in c:
+                self.axarr[loc[0],loc[1]].set_ylabel('Current (A)')
+                self.axarr[loc[0],loc[1]].set_ylim((0, 2))
+            elif c == 'batteries' and 'power' in n:
+                self.axarr[loc[0],loc[1]].set_ylabel('Power (W)')
+                self.axarr[loc[0],loc[1]].set_ylim((0, 40))
+            self.axarr[loc[0],loc[1]].plot(timeline, [x[n] for x in self.results[self.key][c]])
+
+    def plot(self,
+             names: list,
+             legend: bool = False,
+             ):
 
         timeline = [t for t in range(len(self.results[self.key]['input_power']))]
-        fig, axarr = plt.subplots(2, 3, figsize=(50, 20))
 
-        _ = axarr[0,0].set_title('Input Power')
-        _ = axarr[0,0].set_xlabel('Time (s)')
-        _ = axarr[0,0].set_ylabel('Power (W)')
-        _ = axarr[0,0].set_ylim((0, 40))
-        _ = axarr[0,0].plot(timeline, self.results[self.key]['input_power'])
+        max_col = 3
+        l = len(names)
+        rc = math.ceil(l/max_col)
+        n_x = rc
+        n_y = l - max_col * (n_x - 1)
+        figsize = (n_y*20, 10*n_x)
+        self.fig, self.axarr = plt.subplots(n_x, n_y, figsize=figsize, squeeze=False)
+
+        r = 0
+        c = 0
+        for name in names:
+            self.__plot((r, c), timeline, name, legend)
+
+            c += 1
+            if c >= max_col:
+                r += 1
+                c = 0
+
+        self.fig.show()
+        plt.savefig(os.path.join(self.output_folder, self.key + '.jpg'))
+
+    def csv(self,
+            names):
         
-        _ = axarr[0,1].set_title('Output Power')
-        _ = axarr[0,1].set_xlabel('Time (s)')
-        _ = axarr[0,1].set_ylabel('Power (W)')
-        _ = axarr[0,1].set_ylim((0, 40))
-        _ = axarr[0,1].plot(timeline, [sum(x.values()) for x in self.results[self.key]['output_power']])
+        timeline = [t for t in range(len(self.results[self.key]['input_power']))]
+        if self.output_folder is not None:
+            with open(os.path.join(self.output_folder, self.key + '.csv'), 'w') as f:
 
-        _ = axarr[0,2].set_title('Battery DOD')
-        _ = axarr[0,2].plot(timeline, [1 - x['SOC'] for x in self.results[self.key]['batteries']])
+                f.write('time (s),')
+                for name in names:
+                    if type(name) == str:
+                        if 'power' in name:
+                            s = name + ' (W),'
+                        elif 'current' in name:
+                            s = name + ' (A),'
+                        else:
+                            s = name + ','
+                    elif type(name) == list:
+                        if name[0] == 'batteries':
+                            if 'power' in name[1]:
+                                s = name[0] + ' ' + name[1] + ' (W),'
+                            elif 'current' in name[1]:
+                                s = name[0] + ' ' + name[1] + ' (A),'
+                            else:
+                                s = name[0] + ' ' + name[1] + ','
+                        else:
+                            if 'power' in name[0]:
+                                s = name[0] + ' ' + name[1] + ' (W),'
+                            elif 'current' in name[0]:
+                                s = name[0] + ' ' + name[1] + ' (A),'
+                            else:
+                                s = name[0] + ' ' + name[1] + ','
+                    f.write(s)
+                f.write('\n')
 
-        _ = axarr[1,0].set_title('Dissipated Power')
-        _ = axarr[1,0].set_xlabel('Time (s)')
-        _ = axarr[1,0].set_ylabel('Power (W)')
-        _ = axarr[1,0].set_ylim((0, 40))
-        _ = axarr[1,0].plot(timeline, self.results[self.key]['diss_power'])
+                for t in timeline:
+                    values = list()
+                    values.append(str(t))
 
-        _ = axarr[1,1].set_title('Battery Input Power')
-        _ = axarr[1,1].set_xlabel('Time (s)')
-        _ = axarr[1,1].set_ylabel('Power (W)')
-        _ = axarr[1,1].set_ylim((0, 40))
-        _ = axarr[1,1].plot(timeline, [x['input_power'] for x in self.results[self.key]['batteries']])
+                    for name in names:
+                        if type(name) == str:
+                            values.append(str(self.results[self.key][name][t]))
+                        elif type(name) == list:
+                            values.append(str(self.results[self.key][name[0]][t][name[1]]))
+                    line = ','.join(values)
+                    f.write(line + '\n')    
 
-        _ = axarr[1,2].set_title('Battery Output Power')
-        _ = axarr[1,2].set_xlabel('Time (s)')
-        _ = axarr[1,2].set_ylabel('Power (W)')
-        _ = axarr[1,2].set_ylim((0, 40))
-        _ = axarr[1,2].plot(timeline, [x['output_power'] for x in self.results[self.key]['batteries']])
 
-        fig.show()
-        plt.savefig(os.path.join('results/plots', self.key + '.jpg'))
+
+    #     plt.savefig(os.path.join('results/plots', self.key + '.jpg'))
 
     def csv_thermal(self):
         timeline = [t for t in range(len(self.results[self.key]['diss_power']))]
@@ -165,9 +220,9 @@ class Experiment():
         plt.figure(figsize=(30, 10))
         # plt.plot(timeline, self.results[self.key]['input_power'], label = 'solar_power')
         # plt.plot(timeline, self.results[self.key]['heaters_power'], label = 'heaters_power')
-        # plt.plot(timeline, [sum(x.values()) for x in self.results[self.key]['output_power']], label = 'loads_power')
+        # plt.plot(timeline, [sum(x.values()) for x in self.results[self.key]['load_power']], label = 'loads_power')
         # plt.plot(timeline, [x['input_power'] for x in self.results[self.key]['batteries']], label = 'charging_power')
-        # plt.plot(timeline, [sum(x.values()) + y['input_power'] for x, y in zip(self.results[self.key]['output_power'], self.results[self.key]['batteries'])], label = 'loads_power')
+        # plt.plot(timeline, [sum(x.values()) + y['input_power'] for x, y in zip(self.results[self.key]['load_power'], self.results[self.key]['batteries'])], label = 'loads_power')
         plt.plot(timeline, self.results[self.key]['diss_power'], label = 'diss_power')
         plt.title('Dissipated Power')
         plt.xlabel('Time (s)')
@@ -180,14 +235,28 @@ class Experiment():
             params = SystemParameters()
 
             input_power = 0
-            output_power = {
+            total_load_power = 0
+            load_power = {
                 'Vbat': 0,
                 12: 0,
                 5: 0,
                 3.3: 0,
             }
+            load_current = {
+                'Vbat': 0,
+                12: 0,
+                5: 0,
+                3.3: 0,
+            }
+            batteries = {
+                'input_power': 0,
+                'output_power': 0,
+                'SOC': 0,
+                'DOD': 0,
+            }
             diss_power = 0
             h_power = 0
+            ttc_power = 0
 
             for solar_panel in self.solar_panels:
                 solar_panel.step(timestep)
@@ -196,38 +265,41 @@ class Experiment():
             comps += self.components + self.ttcs + self.heaters + [self.payload]
             for comp in comps:
                 comp.step(timestep)
-                output_power[comp.voltage] += comp.input * (2 - params.converters_efficiency) 
+                load_power[comp.voltage] += comp.input * (2 - params.converters_efficiency)
+            for key, value in load_power.items():
+                if type(key) == int or type(key) == float:
+                    load_current[key] = value / key 
             for h in self.heaters:
                 h_power += h.input * (2 - params.converters_efficiency)
+            for ttc in self.ttcs:
+                ttc_power += ttc.input * (2 - params.converters_efficiency)
 
             if self.payload.status == 'transfer':
                 for ttc in self.ttcs:
                     if ttc.mode == 'S-band':
                         ttc.data = self.payload.output_data      
 
-            power = input_power - sum(output_power.values())
+            power = input_power - sum(load_power.values())
             n_packs = len(self.battery_packs)
-            batteries = {
-                'input_power': 0,
-                'output_power': 0,
-                'SOC': 0
-            }
+            
             for battery_pack in self.battery_packs:
                 battery_pack.step(power/n_packs, timestep)
                 batteries['input_power'] += battery_pack.input
-                # output_power['Vbat'] += battery_pack.input
                 batteries['output_power'] += battery_pack.output
                 soc = battery_pack.soc
 
-            batteries['SOC'] += soc 
+            batteries['SOC'] += soc
+            batteries['DOD'] = 1 - batteries['SOC'] 
 
             if power > 0:
-                diss_power = input_power - sum(output_power.values()) - batteries['input_power']
+                diss_power = input_power - sum(load_power.values()) - batteries['input_power']
             else:
                 diss_power = 0
 
             self.results[self.key]['input_power'].append(input_power)
-            self.results[self.key]['output_power'].append(output_power)
+            self.results[self.key]['total_load_power'].append(sum(load_power.values()))
+            self.results[self.key]['load_power'].append(load_power)
+            self.results[self.key]['load_current'].append(load_current)
             self.results[self.key]['batteries'].append(batteries)
             self.results[self.key]['diss_power'].append(diss_power)
 
@@ -243,3 +315,4 @@ class Experiment():
             self.results[self.key]['heaters_status'].append(heaters_status)
 
             self.results[self.key]['heaters_power'].append(h_power)
+            self.results[self.key]['ttc_power'].append(ttc_power)

@@ -43,10 +43,22 @@ class PayloadParameters():
 
 class TTCParameters():
     voltage = 12                        # V
-    idle_power_consumption = 0.1        # W
-    rx_power_consumption = 0.2          # W
-    tx_power_consumption = 9            # W
-    average_power_consumption = 0.9     # W
+    idle_power_consumption = {          
+        'S-band': 0.2,                  # W
+        'UHF': 0.1                      # W
+    }
+    rx_power_consumption = {          
+        'S-band': 0.2,                  # W
+        'UHF': 0.18 + 0.16              # W
+    }
+    tx_power_consumption = {          
+        'S-band': 9,                    # W
+        'UHF': 2.64 + 0.16              # W
+    }
+    average_power_consumption = {          
+        'S-band': (rx_power_consumption['S-band']+tx_power_consumption['S-band'])/2,
+        'UHF': (rx_power_consumption['UHF']+tx_power_consumption['UHF']-0.16)/2
+    }
     datarate = 12.5*10**-3/8            # GB/s
 
 class HeaterParameters():
@@ -60,9 +72,3 @@ class ComponentParameters():
     voltage = 5
     power = 6
     sunlight = False
-
-# class Parameters():
-#     name = ''
-#     power_consumption = 0               # W
-#     voltage = 0                         # V
-#     current = 0                         # A

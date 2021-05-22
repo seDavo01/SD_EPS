@@ -374,10 +374,10 @@ class TTC():
         self.__voltage = parameters.voltage
 
         self.__power = {
-            'idle': parameters.idle_power_consumption,
-            'rx': parameters.rx_power_consumption,
-            'tx': parameters.tx_power_consumption,
-            'rx/tx': parameters.average_power_consumption
+            'idle': parameters.idle_power_consumption[mode],
+            'rx': parameters.rx_power_consumption[mode],
+            'tx': parameters.tx_power_consumption[mode],
+            'rx/tx': parameters.average_power_consumption[mode]
         }   
 
         self.__initdata(GS_data, sunlight, eclipse_data, target, target_data)
