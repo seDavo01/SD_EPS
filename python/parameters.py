@@ -4,6 +4,9 @@ class MissionParameters():
     date_format = '%d %b %Y %H:%M:%S.%f'
     dt_mission_start = datetime.strptime('1 Mar 2023 00:00:00.000', date_format)
     dt_mission_end = datetime.strptime('1 Apr 2023 00:00:00.000', date_format)
+    orbit_period = 5652
+    orbit_eclipse = 2146
+    n_orbit = 15
 
 class SystemParameters():
     solar_efficiency = 0.8
