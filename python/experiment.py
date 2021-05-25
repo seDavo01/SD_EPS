@@ -165,7 +165,7 @@ class Experiment():
         elif type(name) == list and len(name) == 2:
             c = name[0]
             n = name[1]
-            l_name.append('_'.join(name))
+            l_name.append('_'.join([name[0], str(name[1])]))
             # self.axarr[loc[0],loc[1]].set_title(c + ' ' + str(n))
             # self.axarr[loc[0],loc[1]].set_xlabel('Time (h)', fontsize=fontsize)
             if 'power' in c:
