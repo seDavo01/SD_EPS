@@ -139,7 +139,7 @@ class Experiment():
         axarr[0,0].set_xlabel('Orbit n.', fontsize=fontsize)
         axarr[0,0].set_xlim((0, self.missionparameters.n_orbit-1))
         axarr[0,0].set_ylim((0, 40))
-        axarr[0,0].legend(loc='lower right', fontsize=20)
+        axarr[0,0].legend(loc='lower right', fontsize=fontsize)
 
         fig.show()
         plt.savefig(os.path.join(self.output_folder, self.key + '_energy' + '.jpg'), 
