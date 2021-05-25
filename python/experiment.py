@@ -132,8 +132,8 @@ class Experiment():
         
         axarr[0,0].plot(timeline, self.results[self.key]['solar_energy'], label='Solar')
         axarr[0,0].plot(timeline, self.results[self.key]['load_energy'], label='Loads')
-        axarr[0,0].plot(timeline, self.results[self.key]['battery_input_energy'], label='Battery input')
-        axarr[0,0].plot(timeline, self.results[self.key]['battery_output_energy'], label='Battery output')
+        # axarr[0,0].plot(timeline, self.results[self.key]['battery_input_energy'], label='Battery input')
+        # axarr[0,0].plot(timeline, self.results[self.key]['battery_output_energy'], label='Battery output')
 
         axarr[0,0].set_ylabel('Energy (Wh)', fontsize=fontsize)
         axarr[0,0].set_xlabel('Orbit n.', fontsize=fontsize)
