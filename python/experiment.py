@@ -249,9 +249,9 @@ class Experiment():
                                 s = name[0] + ' ' + name[1] + ','
                         else:
                             if 'power' in name[0]:
-                                s = name[0] + ' ' + name[1] + ' (W),'
+                                s = name[0] + ' ' + str(name[1]) + ' (W),'
                             elif 'current' in name[0]:
-                                s = name[0] + ' ' + name[1] + ' (A),'
+                                s = name[0] + ' ' + str(name[1]) + ' (A),'
                             else:
                                 s = name[0] + ' ' + name[1] + ','
                     f.write(s)
